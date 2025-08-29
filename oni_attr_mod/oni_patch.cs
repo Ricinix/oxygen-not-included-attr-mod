@@ -7,6 +7,7 @@ using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
 using TUNING;
+using UnityEngine;
 
 namespace oni_attr_mod
 {
@@ -78,57 +79,193 @@ namespace oni_attr_mod
                     1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000,
                     1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000
                 };
+                // 没有坏习惯
                 TUNING.DUPLICANTSTATS.BADTRAITS = TUNING.DUPLICANTSTATS.GOODTRAITS;
+                // 经验获取加成
+                TUNING.SKILLS.PASSIVE_EXPERIENCE_PORTION = 500f;
+                // 学一个技能给的士气奖励修改
+                TUNING.DUPLICANTSTATS.APTITUDE_BONUS = 1000;
+                // 航天运动服行走速度提升
+                TUNING.EQUIPMENT.SUITS.ATMOSUIT_ATHLETICS = 6;
+                // 铅服行走速度提升
+                TUNING.EQUIPMENT.SUITS.LEADSUIT_ATHLETICS = 8;
+                // 氧气面罩行走速度提升
+                TUNING.EQUIPMENT.SUITS.OXYGEN_MASK_ATHLETICS = 2;
+                // 游戏原始储存上限
+                PrimaryElement.MAX_MASS = 1000000000f;
+
                 Debug.Log($"[ONI_ATTR_MOD] APTITUDE_ATTRIBUTE_BONUSES patched in Db.Initialize. Length: {TUNING.DUPLICANTSTATS.APTITUDE_ATTRIBUTE_BONUSES.Length}");
             }
         }
 
-        // 好特质数量
-        [HarmonyPatch(typeof(MinionStartingStats))]
-        [HarmonyPatch("GenerateTraits")]
-        public class MinionStartingStats_GenerateTraits_Patch
+        // 储存箱100倍修改
+        [HarmonyPatch(typeof(Storage))]
+        [HarmonyPatch(MethodType.Constructor)]
+        public class Storage_Constructor_Patch
         {
-            public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+            public static void Postfix(ref Storage __instance)
             {
-                var codes = new List<CodeInstruction>(instructions);
-                bool patched = false;
+                __instance.capacityKg = 200000000f;
+            }
+        }
 
-                for (int i = 0; i < codes.Count; i++)
-                {
-                    // 寻找 ldc.i4.1 指令（加载常数 1）
-                    if (codes[i].opcode == OpCodes.Ldc_I4_1)
-                    {
-                        // 检查下一条指令是否是 stloc（存储到本地变量），这通常表示 num = 1
-                        if (i + 1 < codes.Count && codes[i + 1].opcode == OpCodes.Stloc_0)
-                        {
-                            // 将 ldc.i4.1 (加载 1) 替换为 ldc.i4.3 (加载 3)
-                            codes[i] = new CodeInstruction(OpCodes.Ldc_I4_3);
-                            patched = true;
-                            Debug.Log("[ONI_ATTR_MOD] Transpiler: Successfully patched num = 1 to num = 3 in GenerateTraits");
-                            break; // 只替换第一个找到的实例
-                        }
-                        // 也检查其他可能的本地变量存储指令
-                        else if (i + 1 < codes.Count &&
-                                (codes[i + 1].opcode == OpCodes.Stloc_1 ||
-                                 codes[i + 1].opcode == OpCodes.Stloc_2 ||
-                                 codes[i + 1].opcode == OpCodes.Stloc_3 ||
-                                 codes[i + 1].opcode == OpCodes.Stloc_S))
-                        {
-                            // 将 ldc.i4.1 替换为 ldc.i4.3
-                            codes[i] = new CodeInstruction(OpCodes.Ldc_I4_3);
-                            patched = true;
-                            Debug.Log("[ONI_ATTR_MOD] Transpiler: Successfully patched num = 1 to num = 3 in GenerateTraits");
-                            break;
-                        }
-                    }
-                }
+        // 储气罐100倍修改
+        [HarmonyPatch(typeof(GasReservoirConfig))]
+        [HarmonyPatch("ConfigureBuildingTemplate")]
+        public class GasReservoirConfig_ConfigureBuildingTemplate_Patch
+        {
+            public static void Postfix(GameObject go)
+            {
+                Storage storage = go.AddOrGet<Storage>();
+                storage.capacityKg = 10000000f;
+                ConduitConsumer conduitConsumer = go.AddOrGet<ConduitConsumer>();
+                conduitConsumer.capacityKG = storage.capacityKg;
+            }
+        }
 
-                if (!patched)
-                {
-                    Debug.LogWarning("[ONI_ATTR_MOD] Transpiler: Could not find num = 1 assignment in GenerateTraits");
-                }
+        // 储气罐100倍修改
+        [HarmonyPatch(typeof(LiquidReservoirConfig))]
+        [HarmonyPatch("ConfigureBuildingTemplate")]
+        public class LiquidReservoirConfig_ConfigureBuildingTemplate_Patch
+        {
+            public static void Postfix(GameObject go)
+            {
+                Storage storage = go.AddOrGet<Storage>();
+                storage.capacityKg = 50000000f;
+                ConduitConsumer conduitConsumer = go.AddOrGet<ConduitConsumer>();
+                conduitConsumer.capacityKG = storage.capacityKg;
+            }
+        }
 
-                return codes.AsEnumerable();
+        // 食物盒100倍修改
+        [HarmonyPatch(typeof(RationBoxConfig))]
+        [HarmonyPatch("ConfigureBuildingTemplate")]
+        public class RationBoxConfig_ConfigureBuildingTemplate_Patch
+        {
+            public static void Postfix(GameObject go)
+            {
+                Storage storage = go.AddOrGet<Storage>();
+                storage.capacityKg = 1500000f;
+            }
+        }
+
+        // 冰箱1000倍修改
+        [HarmonyPatch(typeof(RefrigeratorConfig))]
+        [HarmonyPatch("DoPostConfigureComplete")]
+        public class RefrigeratorConfig_DoPostConfigureComplete_Patch
+        {
+            public static void Postfix(GameObject go)
+            {
+                Storage storage = go.AddOrGet<Storage>();
+                storage.capacityKg = 1000000f;
+            }
+        }
+
+        // 电池电量100倍 and 耗电量修改
+        [HarmonyPatch(typeof(BatteryConfig))]
+        [HarmonyPatch("DoPostConfigureComplete")]
+        public class BatteryConfig_DoPostConfigureComplete_Patch
+        {
+            public static void Postfix(GameObject go)
+            {
+                Battery battery = go.AddOrGet<Battery>();
+                battery.capacity = 100000000f;
+                battery.joulesLostPerSecond = 0.6666666f;
+            }
+        }
+
+        // 电线负载修改
+        [HarmonyPatch(typeof(Wire))]
+        [HarmonyPatch("GetMaxWattageAsFloat")]
+        public class Wire_GetMaxWattageAsFloat_Patch
+        {
+            public static void Postfix(ref float __result)
+            {
+                __result = 50000000f;
+            }
+        }
+
+        // 发电机发电100倍
+        [HarmonyPatch(typeof(GeneratorConfig))]
+        [HarmonyPatch("CreateBuildingDef")]
+        public class GeneratorConfig_CreateBuildingDef_Patch
+        {
+            public static void Postfix(ref BuildingDef __result)
+            {
+                __result.GeneratorWattageRating = 6000000f;
+                __result.GeneratorBaseCapacity = __result.GeneratorWattageRating;
+            }
+        }
+
+        // 人力发电机发电100倍
+        [HarmonyPatch(typeof(ManualGeneratorConfig))]
+        [HarmonyPatch("CreateBuildingDef")]
+        public class ManualGeneratorConfig_CreateBuildingDef_Patch
+        {
+            public static void Postfix(ref BuildingDef __result)
+            {
+                __result.GeneratorWattageRating = 4000000f;
+                __result.GeneratorBaseCapacity = __result.GeneratorWattageRating;
+            }
+        }
+
+        // 天燃气发电机发电100倍
+        [HarmonyPatch(typeof(MethaneGeneratorConfig))]
+        [HarmonyPatch("CreateBuildingDef")]
+        public class MethaneGeneratorConfig_CreateBuildingDef_Patch
+        {
+            public static void Postfix(ref BuildingDef __result)
+            {
+                __result.GeneratorWattageRating = 8000000f;
+                __result.GeneratorBaseCapacity = __result.GeneratorWattageRating;
+            }
+        }
+
+        // 氢气发电机发电100倍
+        [HarmonyPatch(typeof(HydrogenGeneratorConfig))]
+        [HarmonyPatch("CreateBuildingDef")]
+        public class HydrogenGeneratorConfig_CreateBuildingDef_Patch
+        {
+            public static void Postfix(ref BuildingDef __result)
+            {
+                __result.GeneratorWattageRating = 8000000f;
+                __result.GeneratorBaseCapacity = __result.GeneratorWattageRating;
+            }
+        }
+
+        // 石油发电机发电100倍
+        [HarmonyPatch(typeof(PetroleumGeneratorConfig))]
+        [HarmonyPatch("CreateBuildingDef")]
+        public class PetroleumGeneratorConfig_CreateBuildingDef_Patch
+        {
+            public static void Postfix(ref BuildingDef __result)
+            {
+                __result.GeneratorWattageRating = 20000000f;
+                __result.GeneratorBaseCapacity = __result.GeneratorWattageRating;
+            }
+        }
+
+        // 木燃发电机发电100倍
+        [HarmonyPatch(typeof(WoodGasGeneratorConfig))]
+        [HarmonyPatch("CreateBuildingDef")]
+        public class WoodGasGeneratorConfig_CreateBuildingDef_Patch
+        {
+            public static void Postfix(ref BuildingDef __result)
+            {
+                __result.GeneratorWattageRating = 3000000f;
+                __result.GeneratorBaseCapacity = __result.GeneratorWattageRating;
+            }
+        }
+
+        // 蒸汽发电机发电100倍
+        [HarmonyPatch(typeof(StaterpillarGeneratorConfig))]
+        [HarmonyPatch("CreateBuildingDef")]
+        public class StaterpillarGeneratorConfig_CreateBuildingDef_Patch
+        {
+            public static void Postfix(ref BuildingDef __result)
+            {
+                __result.GeneratorWattageRating = 16000000f;
+                __result.GeneratorBaseCapacity = __result.GeneratorWattageRating;
             }
         }
     }
